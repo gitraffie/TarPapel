@@ -14,8 +14,8 @@ function inchesToPixels(inches) {
 async function resizeToPoster(imagePath, widthPx, heightPx) {
   return sharp(imagePath, { limitInputPixels: false })
     .resize(widthPx, heightPx, {
-      fit: "contain",
-      background: { r: 255, g: 255, b: 255, alpha: 1 }
+      fit: "cover",
+      position: "center"
     })
     .png()
     .toBuffer();

@@ -156,7 +156,33 @@ function renderPreview() {
   ctx.save();
   ctx.fillStyle = "#111827";
   ctx.fillRect(offsetX, offsetY, drawWidth, drawHeight);
-  ctx.drawImage(previewImage, offsetX, offsetY, drawWidth, drawHeight);
+
+  const posterAspect = drawWidth / drawHeight;
+  const imageAspect = previewImage.width / previewImage.height;
+  let srcWidth = previewImage.width;
+  let srcHeight = previewImage.height;
+  let srcX = 0;
+  let srcY = 0;
+
+  if (imageAspect > posterAspect) {
+    srcWidth = previewImage.height * posterAspect;
+    srcX = (previewImage.width - srcWidth) / 2;
+  } else {
+    srcHeight = previewImage.width / posterAspect;
+    srcY = (previewImage.height - srcHeight) / 2;
+  }
+
+  ctx.drawImage(
+    previewImage,
+    srcX,
+    srcY,
+    srcWidth,
+    srcHeight,
+    offsetX,
+    offsetY,
+    drawWidth,
+    drawHeight
+  );
 
   ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
   ctx.lineWidth = 1;
