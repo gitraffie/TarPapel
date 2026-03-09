@@ -31,6 +31,19 @@ Generate print-ready, tiled PDFs for large tarpapel posters using a regular prin
    http://localhost:3000
    ```
 
+## GitHub Pages (Frontend Only)
+1. Copy the frontend to `docs/`:
+   ```bash
+   powershell -Command "New-Item -ItemType Directory -Force -Path docs | Out-Null; Copy-Item -Path client\\* -Destination docs\\ -Recurse -Force"
+   ```
+2. Commit and push.
+3. In GitHub, go to **Settings → Pages** and set:
+   - Source: `Deploy from a branch`
+   - Branch: `main`
+   - Folder: `/docs`
+
+Note: GitHub Pages will host only the frontend. The PDF generation API still requires the Node/Express backend to be hosted elsewhere.
+
 ## API
 `POST /api/generate`
 

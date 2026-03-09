@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tarpapel Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="tarpapel-logo.png" />
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="radial-bg"></div>
+
+    <main class="relative z-10 mx-auto max-w-6xl px-6 py-12">
+      <header class="mb-10">
+        <div class="flex items-center gap-4">
+          <img src="tarpapel-logo.png" alt="Tarpapel logo" class="logo" />
+          <div>
+            <p class="eyebrow text-amber-200">Print-ready poster tiling</p>
+            <h1 class="title text-4xl md:text-6xl">Tarpapel Generator</h1>
+          </div>
+        </div>
+        <p class="subtitle mt-4 max-w-2xl text-slate-300">
+          Upload an image, choose poster and paper sizes, then download a tiled PDF
+          you can print and assemble into a large tarpapel poster.
+        </p>
+      </header>
+
+      <section class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <div class="space-y-8">
+          <div class="panel p-6">
+            <h2 class="section-title">Upload Image</h2>
+            <div id="dropzone" class="dropzone mt-4">
+              <input id="imageInput" type="file" accept="image/*" hidden />
+              <div class="dropzone-content">
+                <p class="font-medium">Drag & drop your image here</p>
+                <p class="text-sm text-slate-300">or click to browse (JPG/PNG, up to 25 MB)</p>
+                <button id="browseButton" class="btn btn-secondary mt-4" type="button">Choose File</button>
+              </div>
+            </div>
+            <div class="mt-4 flex items-center gap-3 text-sm text-slate-300">
+              <span class="status-dot" id="uploadStatus"></span>
+              <span id="fileName">No image selected.</span>
+            </div>
+          </div>
+
+          <div class="panel p-6">
+            <h2 class="section-title">Poster Size</h2>
+            <div class="mt-4 grid gap-3 md:grid-cols-2">
+              <label class="option">
+                <input type="radio" name="posterSize" value="2x3" checked />
+                <span>2 x 3 ft</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="posterSize" value="3x4" />
+                <span>3 x 4 ft</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="posterSize" value="4x6" />
+                <span>4 x 6 ft</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="posterSize" value="custom" />
+                <span>Custom</span>
+              </label>
+            </div>
+            <div id="customSizeFields" class="mt-4 hidden grid grid-cols-2 gap-4">
+              <div>
+                <label class="field-label" for="customWidth">Width (ft)</label>
+                <input id="customWidth" type="number" min="1" step="0.1" class="field-input" placeholder="e.g. 5" />
+              </div>
+              <div>
+                <label class="field-label" for="customHeight">Height (ft)</label>
+                <input id="customHeight" type="number" min="1" step="0.1" class="field-input" placeholder="e.g. 7" />
+              </div>
+            </div>
+          </div>
+
+          <div class="panel p-6">
+            <h2 class="section-title">Paper Size</h2>
+            <div class="mt-4 grid gap-3 md:grid-cols-2">
+              <label class="option">
+                <input type="radio" name="paperSize" value="A4" checked />
+                <span>A4</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="paperSize" value="A3" />
+                <span>A3</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="paperSize" value="Letter" />
+                <span>Letter</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="paperSize" value="Legal" />
+                <span>Legal</span>
+              </label>
+              <label class="option">
+                <input type="radio" name="paperSize" value="Tabloid" />
+                <span>Tabloid</span>
+              </label>
+            </div>
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+              <div>
+                <label class="field-label" for="overlap">Tile Overlap (inches)</label>
+                <input id="overlap" type="range" min="0" max="1" step="0.05" value="0.25" class="range-input" />
+                <div class="text-sm text-slate-300 mt-1">Overlap: <span id="overlapValue">0.25</span> in</div>
+              </div>
+              <label class="toggle">
+                <input id="includeGuides" type="checkbox" />
+                <span>Add cut guide lines</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="panel p-6 flex flex-col gap-4">
+            <button id="generateButton" class="btn btn-primary" type="button">Generate PDF</button>
+            <button id="downloadButton" class="btn btn-secondary" type="button" disabled>Download Tiled PDF</button>
+            <p id="statusMessage" class="text-sm text-slate-300"></p>
+          </div>
+        </div>
+
+        <div class="panel p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="section-title">Preview</h2>
+            <span id="tileSummary" class="text-xs uppercase text-amber-200 tracking-widest">No tiles yet</span>
+          </div>
+          <div class="preview-wrapper">
+            <canvas id="previewCanvas" width="500" height="640"></canvas>
+          </div>
+          <p class="text-sm text-slate-300">
+            Preview shows the poster area with estimated tile grid. The PDF will include full-resolution
+            tiles and optional overlap margins.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
