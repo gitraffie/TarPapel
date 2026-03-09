@@ -49,12 +49,77 @@ function clampOverlap(overlapIn, baseWidthIn, baseHeightIn) {
   return Math.max(0, Math.min(overlapIn, maxOverlap));
 }
 
-function getTileLayout(posterWidthPx, posterHeightPx, baseWidthPx, baseHeightPx, overlapPx) {
-  const stepX = Math.max(1, baseWidthPx - overlapPx);
-  const stepY = Math.max(1, baseHeightPx - overlapPx);
-  const columns = Math.ceil((posterWidthPx - overlapPx) / stepX);
-  const rows = Math.ceil((posterHeightPx - overlapPx) / stepY);
-  return { columns, rows, stepX, stepY };
+function getTileMargins(rowIndex, colIndex, rows, columns, extraOverlapIn) {
+  const isTopRow = rowIndex === 0;
+  const isBottomRow = rowIndex === rows - 1;
+  const isLeftCol = colIndex === 0;
+  const isRightCol = colIndex === columns - 1;
+  const marginValue = MARGIN_IN + extraOverlapIn;
+
+  const margins = { top: 0, left: 0, right: 0 };
+
+  if (!isTopRow || isBottomRow) {
+    margins.top = marginValue;
+  }
+
+  if (isLeftCol) {
+    margins.right = marginValue;
+  } else if (isRightCol) {
+    margins.left = marginValue;
+  } else {
+    margins.left = marginValue;
+    margins.right = marginValue;
+  }
+
+  return margins;
+}
+
+function buildTileStarts(posterSizePx, paperSizePx, columns, rows, extraOverlapIn) {
+  const colStarts = [0];
+  for (let col = 1; col < columns; col += 1) {
+    const prevMargins = getTileMargins(0, col - 1, rows, columns, extraOverlapIn);
+    const currMargins = getTileMargins(0, col, rows, columns, extraOverlapIn);
+    const step = paperSizePx.width - inchesToPixels(prevMargins.right + currMargins.left);
+    colStarts[col] = colStarts[col - 1] + step;
+  }
+
+  const rowStarts = [0];
+  for (let row = 1; row < rows; row += 1) {
+    const currMargins = getTileMargins(row, 0, rows, columns, extraOverlapIn);
+    const step = paperSizePx.height - inchesToPixels(currMargins.top);
+    rowStarts[row] = rowStarts[row - 1] + step;
+  }
+
+  return { colStarts, rowStarts };
+}
+
+function computeTileLayout(posterWidthPx, posterHeightPx, paperSizePx, extraOverlapIn) {
+  const baseStepX = paperSizePx.width - inchesToPixels((MARGIN_IN + extraOverlapIn) * 2);
+  const baseStepY = paperSizePx.height - inchesToPixels(MARGIN_IN + extraOverlapIn);
+
+  let columns = Math.max(1, Math.ceil(posterWidthPx / baseStepX));
+  let rows = Math.max(1, Math.ceil(posterHeightPx / baseStepY));
+
+  while (true) {
+    const { colStarts, rowStarts } = buildTileStarts(
+      { width: posterWidthPx, height: posterHeightPx },
+      paperSizePx,
+      columns,
+      rows,
+      extraOverlapIn
+    );
+    const totalWidth = colStarts[colStarts.length - 1] + paperSizePx.width;
+    const totalHeight = rowStarts[rowStarts.length - 1] + paperSizePx.height;
+
+    const needsMoreCols = totalWidth < posterWidthPx;
+    const needsMoreRows = totalHeight < posterHeightPx;
+
+    if (!needsMoreCols && !needsMoreRows) {
+      return { columns, rows, colStarts, rowStarts };
+    }
+    if (needsMoreCols) columns += 1;
+    if (needsMoreRows) rows += 1;
+  }
 }
 
 async function createTileBuffer(sourceBuffer, posterWidthPx, posterHeightPx, x, y, tileWidthPx, tileHeightPx) {
@@ -125,30 +190,6 @@ function drawMarginGuides(page, paperWidthPt, paperHeightPt, marginsPt) {
   }
 }
 
-function getTileMargins(rowIndex, colIndex, rows, columns) {
-  const isTopRow = rowIndex === 0;
-  const isBottomRow = rowIndex === rows - 1;
-  const isLeftCol = colIndex === 0;
-  const isRightCol = colIndex === columns - 1;
-
-  const margins = { top: 0, left: 0, right: 0 };
-
-  if (!isTopRow || isBottomRow) {
-    margins.top = MARGIN_IN;
-  }
-
-  if (isLeftCol) {
-    margins.right = MARGIN_IN;
-  } else if (isRightCol) {
-    margins.left = MARGIN_IN;
-  } else {
-    margins.left = MARGIN_IN;
-    margins.right = MARGIN_IN;
-  }
-
-  return margins;
-}
-
 async function generateTiledPdf({
   imagePath,
   posterSize,
@@ -160,51 +201,46 @@ async function generateTiledPdf({
 }) {
   const posterDims = getPosterDimensions(posterSize, customWidth, customHeight);
   const paperDims = getPaperDimensions(paperSize);
-
-  const baseContentWidthIn = paperDims.widthIn - MARGIN_IN * 2;
-  const baseContentHeightIn = paperDims.heightIn - MARGIN_IN;
-
-  const overlapIn = clampOverlap(overlap, baseContentWidthIn, baseContentHeightIn);
+  const overlapIn = clampOverlap(overlap, paperDims.widthIn, paperDims.heightIn);
 
   const posterWidthPx = feetToPixels(posterDims.widthFt);
   const posterHeightPx = feetToPixels(posterDims.heightFt);
-  const baseContentWidthPx = inchesToPixels(baseContentWidthIn);
-  const baseContentHeightPx = inchesToPixels(baseContentHeightIn);
-  const overlapPx = inchesToPixels(overlapIn);
+  const paperWidthPx = inchesToPixels(paperDims.widthIn);
+  const paperHeightPx = inchesToPixels(paperDims.heightIn);
 
   const resizedBuffer = await resizeToPoster(imagePath, posterWidthPx, posterHeightPx);
-  const layout = getTileLayout(posterWidthPx, posterHeightPx, baseContentWidthPx, baseContentHeightPx, overlapPx);
+  const layout = computeTileLayout(
+    posterWidthPx,
+    posterHeightPx,
+    { width: paperWidthPx, height: paperHeightPx },
+    overlapIn
+  );
 
   const pdfDoc = await PDFDocument.create();
   const paperWidthPt = paperDims.widthIn * 72;
   const paperHeightPt = paperDims.heightIn * 72;
   for (let row = 0; row < layout.rows; row += 1) {
     for (let col = 0; col < layout.columns; col += 1) {
-      const tileMarginsIn = getTileMargins(row, col, layout.rows, layout.columns);
-      const contentWidthIn = paperDims.widthIn - tileMarginsIn.left - tileMarginsIn.right;
-      const contentHeightIn = paperDims.heightIn - tileMarginsIn.top;
-      const contentWidthPx = inchesToPixels(contentWidthIn);
-      const contentHeightPx = inchesToPixels(contentHeightIn);
-
-      const x = col * layout.stepX;
-      const y = row * layout.stepY;
+      const tileMarginsIn = getTileMargins(row, col, layout.rows, layout.columns, overlapIn);
+      const x = layout.colStarts[col];
+      const y = layout.rowStarts[row];
       const tileBuffer = await createTileBuffer(
         resizedBuffer,
         posterWidthPx,
         posterHeightPx,
         x,
         y,
-        contentWidthPx,
-        contentHeightPx
+        paperWidthPx,
+        paperHeightPx
       );
 
       const page = pdfDoc.addPage([paperWidthPt, paperHeightPt]);
       const embedded = await pdfDoc.embedPng(tileBuffer);
       page.drawImage(embedded, {
-        x: tileMarginsIn.left * 72,
+        x: 0,
         y: 0,
-        width: contentWidthIn * 72,
-        height: contentHeightIn * 72
+        width: paperDims.widthIn * 72,
+        height: paperDims.heightIn * 72
       });
 
       if (includeGuides) {

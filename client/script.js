@@ -96,6 +96,49 @@ function loadPreview(file) {
   });
 }
 
+function getTileMargins(rowIndex, colIndex, rows, columns, extraOverlap) {
+  const isTopRow = rowIndex === 0;
+  const isBottomRow = rowIndex === rows - 1;
+  const isLeftCol = colIndex === 0;
+  const isRightCol = colIndex === columns - 1;
+  const marginValue = MARGIN_IN + extraOverlap;
+  const margins = { top: 0, left: 0, right: 0 };
+
+  if (!isTopRow || isBottomRow) {
+    margins.top = marginValue;
+  }
+
+  if (isLeftCol) {
+    margins.right = marginValue;
+  } else if (isRightCol) {
+    margins.left = marginValue;
+  } else {
+    margins.left = marginValue;
+    margins.right = marginValue;
+  }
+
+  return margins;
+}
+
+function buildTileStarts(posterSizeIn, paperSizeIn, columns, rows, extraOverlap) {
+  const colStarts = [0];
+  for (let col = 1; col < columns; col += 1) {
+    const prevMargins = getTileMargins(0, col - 1, rows, columns, extraOverlap);
+    const currMargins = getTileMargins(0, col, rows, columns, extraOverlap);
+    const step = paperSizeIn.width - (prevMargins.right + currMargins.left);
+    colStarts[col] = colStarts[col - 1] + step;
+  }
+
+  const rowStarts = [0];
+  for (let row = 1; row < rows; row += 1) {
+    const currMargins = getTileMargins(row, 0, rows, columns, extraOverlap);
+    const step = paperSizeIn.height - currMargins.top;
+    rowStarts[row] = rowStarts[row - 1] + step;
+  }
+
+  return { colStarts, rowStarts };
+}
+
 function computeTileLayout() {
   const poster = getPosterSizeSelection();
   const paper = PAPER_SIZES[getPaperSelection()];
@@ -107,15 +150,31 @@ function computeTileLayout() {
 
   const posterWidthIn = poster.widthFt * 12;
   const posterHeightIn = poster.heightFt * 12;
-  const printableWidthIn = paper.widthIn - MARGIN_IN * 2;
-  const printableHeightIn = paper.heightIn - MARGIN_IN;
+  const baseStepX = paper.widthIn - (MARGIN_IN + overlapIn) * 2;
+  const baseStepY = paper.heightIn - (MARGIN_IN + overlapIn);
+  let columns = Math.max(1, Math.ceil(posterWidthIn / baseStepX));
+  let rows = Math.max(1, Math.ceil(posterHeightIn / baseStepY));
 
-  const stepX = Math.max(0.1, printableWidthIn - overlapIn);
-  const stepY = Math.max(0.1, printableHeightIn - overlapIn);
+  while (true) {
+    const { colStarts, rowStarts } = buildTileStarts(
+      { width: posterWidthIn, height: posterHeightIn },
+      { width: paper.widthIn, height: paper.heightIn },
+      columns,
+      rows,
+      overlapIn
+    );
+    const totalWidth = colStarts[colStarts.length - 1] + paper.widthIn;
+    const totalHeight = rowStarts[rowStarts.length - 1] + paper.heightIn;
 
-  const columns = Math.ceil((posterWidthIn - overlapIn) / stepX);
-  const rows = Math.ceil((posterHeightIn - overlapIn) / stepY);
-  return { columns, rows };
+    const needsMoreCols = totalWidth < posterWidthIn;
+    const needsMoreRows = totalHeight < posterHeightIn;
+
+    if (!needsMoreCols && !needsMoreRows) {
+      return { columns, rows, colStarts, rowStarts };
+    }
+    if (needsMoreCols) columns += 1;
+    if (needsMoreRows) rows += 1;
+  }
 }
 
 function renderPreview() {
@@ -184,17 +243,24 @@ function renderPreview() {
     drawHeight
   );
 
+  const colStarts = layout.colStarts || [];
+  const rowStarts = layout.rowStarts || [];
+  const posterWidthIn = poster.widthFt * 12;
+  const posterHeightIn = poster.heightFt * 12;
+
   ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
   ctx.lineWidth = 1;
   for (let col = 1; col < layout.columns; col += 1) {
-    const x = offsetX + (drawWidth / layout.columns) * col;
+    const ratio = colStarts[col] / posterWidthIn;
+    const x = offsetX + drawWidth * ratio;
     ctx.beginPath();
     ctx.moveTo(x, offsetY);
     ctx.lineTo(x, offsetY + drawHeight);
     ctx.stroke();
   }
   for (let row = 1; row < layout.rows; row += 1) {
-    const y = offsetY + (drawHeight / layout.rows) * row;
+    const ratio = rowStarts[row] / posterHeightIn;
+    const y = offsetY + drawHeight * ratio;
     ctx.beginPath();
     ctx.moveTo(offsetX, y);
     ctx.lineTo(offsetX + drawWidth, y);
