@@ -571,8 +571,8 @@ previewCanvas.addEventListener("pointermove", (event) => {
   const maxShiftX = Math.max(0, previewImage.width - srcWidth);
   const maxShiftY = Math.max(0, previewImage.height - srcHeight);
 
-  panX = Math.min(maxShiftX, Math.max(0, dragState.panX + dx * scaleX));
-  panY = Math.min(maxShiftY, Math.max(0, dragState.panY + dy * scaleY));
+  panX = Math.min(maxShiftX, Math.max(0, dragState.panX - dx * scaleX));
+  panY = Math.min(maxShiftY, Math.max(0, dragState.panY - dy * scaleY));
 
   setPositionSaved(false);
   renderPreview();
