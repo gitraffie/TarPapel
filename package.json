@@ -1,0 +1,20 @@
+{
+  "name": "tarpapel-tile-generator",
+  "version": "1.0.0",
+  "description": "Generate print-ready tiled PDFs for large tarpapel posters.",
+  "main": "server/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.33.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
