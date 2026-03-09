@@ -121,6 +121,12 @@
 
           <div class="panel p-6 flex flex-col gap-4">
             <button id="generateButton" class="btn btn-primary" type="button">Generate PDF</button>
+            <div id="progressWrap" class="hidden">
+              <div class="progress-track">
+                <div id="progressBar" class="progress-bar"></div>
+              </div>
+              <p id="progressLabel" class="text-xs text-slate-400 mt-2">Preparing...</p>
+            </div>
             <button id="downloadButton" class="btn btn-secondary" type="button" disabled>Download Tiled PDF</button>
             <p id="statusMessage" class="text-sm text-slate-300"></p>
           </div>

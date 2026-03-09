@@ -12,6 +12,9 @@ const previewCanvas = document.getElementById("previewCanvas");
 const tileSummary = document.getElementById("tileSummary");
 const customSizeFields = document.getElementById("customSizeFields");
 const includeGuides = document.getElementById("includeGuides");
+const progressWrap = document.getElementById("progressWrap");
+const progressBar = document.getElementById("progressBar");
+const progressLabel = document.getElementById("progressLabel");
 
 let selectedFile = null;
 let previewImage = null;
@@ -19,6 +22,8 @@ let pdfBlobUrl = null;
 const API_BASE = window.location.hostname.endsWith("github.io")
   ? "https://tarpapel.onrender.com"
   : "";
+let progressTimer = null;
+let progressValue = 0;
 
 const PAPER_SIZES = {
   A4: { widthIn: 8.27, heightIn: 11.69 },
@@ -194,6 +199,42 @@ function clearDownload() {
   downloadButton.disabled = true;
 }
 
+function startProgress() {
+  progressValue = 5;
+  progressBar.style.width = `${progressValue}%`;
+  progressLabel.textContent = "Processing image...";
+  progressWrap.classList.remove("hidden");
+  progressTimer = setInterval(() => {
+    progressValue = Math.min(progressValue + Math.random() * 12, 90);
+    progressBar.style.width = `${progressValue}%`;
+    progressLabel.textContent = "Rendering tiles...";
+  }, 700);
+}
+
+function finishProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  progressBar.style.width = "100%";
+  progressLabel.textContent = "Finalizing PDF...";
+  setTimeout(() => {
+    progressWrap.classList.add("hidden");
+    progressBar.style.width = "0%";
+    progressLabel.textContent = "Preparing...";
+  }, 800);
+}
+
+function failProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  progressWrap.classList.add("hidden");
+  progressBar.style.width = "0%";
+  progressLabel.textContent = "Preparing...";
+}
+
 function getFormPayload() {
   const poster = getPosterSizeSelection();
   const paperSize = getPaperSelection();
@@ -273,6 +314,7 @@ generateButton.addEventListener("click", async () => {
 
   setStatus("Generating PDF. This may take a minute for large posters.");
   generateButton.disabled = true;
+  startProgress();
 
   try {
     const response = await fetch(`${API_BASE}/api/generate`, {
@@ -288,8 +330,10 @@ generateButton.addEventListener("click", async () => {
     const blob = await response.blob();
     pdfBlobUrl = URL.createObjectURL(blob);
     downloadButton.disabled = false;
+    finishProgress();
     setStatus("PDF ready! Click download to save it.", "success");
   } catch (error) {
+    failProgress();
     setStatus(error.message, "error");
   } finally {
     generateButton.disabled = false;
