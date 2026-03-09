@@ -27,8 +27,10 @@ const API_BASE = window.location.hostname.endsWith("github.io")
   : "";
 let progressTimer = null;
 let progressValue = 0;
-let offsetX = 0;
-let offsetY = 0;
+let panX = 0;
+let panY = 0;
+let focalX = 0;
+let focalY = 0;
 let dragState = null;
 let isPositionSaved = false;
 
@@ -261,8 +263,13 @@ function renderPreview() {
 
   const maxShiftX = Math.max(0, previewImage.width - srcWidth);
   const maxShiftY = Math.max(0, previewImage.height - srcHeight);
-  srcX = Math.min(maxShiftX, Math.max(0, srcX + offsetX * (maxShiftX / 2)));
-  srcY = Math.min(maxShiftY, Math.max(0, srcY + offsetY * (maxShiftY / 2)));
+  srcX = Math.min(maxShiftX, Math.max(0, srcX + panX));
+  srcY = Math.min(maxShiftY, Math.max(0, srcY + panY));
+
+  const centerX = srcX + srcWidth / 2;
+  const centerY = srcY + srcHeight / 2;
+  focalX = (centerX / previewImage.width) * 2 - 1;
+  focalY = (centerY / previewImage.height) * 2 - 1;
 
   ctx.drawImage(
     previewImage,
@@ -310,8 +317,10 @@ async function handleFile(file) {
   updateFileStatus(file);
   try {
     previewImage = await loadPreview(file);
-    offsetX = 0;
-    offsetY = 0;
+    panX = 0;
+    panY = 0;
+    focalX = 0;
+    focalY = 0;
     setPositionSaved(false);
     renderPreview();
   } catch (error) {
@@ -375,8 +384,8 @@ function getFormPayload() {
     customWidth: poster.widthFt || "",
     customHeight: poster.heightFt || "",
     includeGuides: includeGuides.checked,
-    focalX: offsetX.toFixed(3),
-    focalY: offsetY.toFixed(3)
+    focalX: focalX.toFixed(3),
+    focalY: focalY.toFixed(3)
   };
 }
 
@@ -501,8 +510,10 @@ savePositionButton.addEventListener("click", () => {
 
 resetPositionButton.addEventListener("click", () => {
   if (!previewImage) return;
-  offsetX = 0;
-  offsetY = 0;
+  panX = 0;
+  panY = 0;
+  focalX = 0;
+  focalY = 0;
   setPositionSaved(false);
   renderPreview();
 });
@@ -510,27 +521,74 @@ resetPositionButton.addEventListener("click", () => {
 previewCanvas.addEventListener("pointerdown", (event) => {
   if (!previewImage) return;
   const rect = previewCanvas.getBoundingClientRect();
+  previewCanvas.setPointerCapture(event.pointerId);
   dragState = {
+    pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
     rect,
-    offsetX,
-    offsetY
+    panX,
+    panY
   };
   previewCanvas.classList.add("dragging");
+  event.preventDefault();
 });
 
-window.addEventListener("pointermove", (event) => {
+previewCanvas.addEventListener("pointermove", (event) => {
   if (!dragState) return;
-  const dx = (event.clientX - dragState.startX) / dragState.rect.width;
-  const dy = (event.clientY - dragState.startY) / dragState.rect.height;
-  offsetX = Math.max(-1, Math.min(1, dragState.offsetX + dx * 2));
-  offsetY = Math.max(-1, Math.min(1, dragState.offsetY + dy * 2));
+  const dx = event.clientX - dragState.startX;
+  const dy = event.clientY - dragState.startY;
+
+  const poster = getPosterSizeSelection();
+  const orientation = getOrientationSelection();
+  const posterWidthFt = orientation === "landscape" ? poster.heightFt : poster.widthFt;
+  const posterHeightFt = orientation === "landscape" ? poster.widthFt : poster.heightFt;
+
+  if (!posterWidthFt || !posterHeightFt) return;
+
+  const aspect = posterWidthFt / posterHeightFt;
+  let drawWidth = previewCanvas.width * 0.85;
+  let drawHeight = drawWidth / aspect;
+  if (drawHeight > previewCanvas.height * 0.85) {
+    drawHeight = previewCanvas.height * 0.85;
+    drawWidth = drawHeight * aspect;
+  }
+
+  const posterAspect = drawWidth / drawHeight;
+  const imageAspect = previewImage.width / previewImage.height;
+  let srcWidth = previewImage.width;
+  let srcHeight = previewImage.height;
+
+  if (imageAspect > posterAspect) {
+    srcWidth = previewImage.height * posterAspect;
+  } else {
+    srcHeight = previewImage.width / posterAspect;
+  }
+
+  const scaleX = srcWidth / drawWidth;
+  const scaleY = srcHeight / drawHeight;
+
+  const maxShiftX = Math.max(0, previewImage.width - srcWidth);
+  const maxShiftY = Math.max(0, previewImage.height - srcHeight);
+
+  panX = Math.min(maxShiftX, Math.max(0, dragState.panX + dx * scaleX));
+  panY = Math.min(maxShiftY, Math.max(0, dragState.panY + dy * scaleY));
+
   setPositionSaved(false);
   renderPreview();
+  event.preventDefault();
 });
 
-window.addEventListener("pointerup", () => {
+previewCanvas.addEventListener("pointerup", () => {
+  if (!dragState) return;
+  if (dragState.pointerId !== undefined) {
+    previewCanvas.releasePointerCapture(dragState.pointerId);
+  }
+  dragState = null;
+  previewCanvas.classList.remove("dragging");
+});
+
+previewCanvas.addEventListener("pointerleave", () => {
   if (!dragState) return;
   dragState = null;
   previewCanvas.classList.remove("dragging");
