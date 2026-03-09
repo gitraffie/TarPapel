@@ -6,23 +6,8 @@ const generateRoute = require("./routes/generate");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "https://gitraffie.github.io"
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Not allowed by CORS"));
-    }
-  })
-);
+app.use(cors({ origin: true }));
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
