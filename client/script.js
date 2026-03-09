@@ -16,6 +16,9 @@ const includeGuides = document.getElementById("includeGuides");
 let selectedFile = null;
 let previewImage = null;
 let pdfBlobUrl = null;
+const API_BASE = window.location.hostname.endsWith("github.io")
+  ? "https://tarpapel.onrender.com"
+  : "";
 
 const PAPER_SIZES = {
   A4: { widthIn: 8.27, heightIn: 11.69 },
@@ -272,7 +275,7 @@ generateButton.addEventListener("click", async () => {
   generateButton.disabled = true;
 
   try {
-    const response = await fetch("/api/generate", {
+    const response = await fetch(`${API_BASE}/api/generate`, {
       method: "POST",
       body: formData
     });
