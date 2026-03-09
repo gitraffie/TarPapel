@@ -1,4 +1,4 @@
-# Tarpapel Tile Generator
+# Tarpapel Generator
 
 Generate print-ready, tiled PDFs for large tarpapel posters using a regular printer.
 
