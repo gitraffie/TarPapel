@@ -198,6 +198,11 @@ canvas {
   height: auto;
   border-radius: 12px;
   background: #0f172a;
+  cursor: grab;
+}
+
+canvas.dragging {
+  cursor: grabbing;
 }
 
 .radial-bg {

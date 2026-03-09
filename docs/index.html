@@ -80,6 +80,19 @@
                 <input id="customHeight" type="number" min="1" step="0.1" class="field-input" placeholder="e.g. 7" />
               </div>
             </div>
+            <div class="mt-6">
+              <p class="field-label mb-2">Orientation</p>
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="option">
+                  <input type="radio" name="orientation" value="portrait" checked />
+                  <span>Portrait</span>
+                </label>
+                <label class="option">
+                  <input type="radio" name="orientation" value="landscape" />
+                  <span>Landscape</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div class="panel p-6">
@@ -140,9 +153,13 @@
           <div class="preview-wrapper">
             <canvas id="previewCanvas" width="500" height="640"></canvas>
           </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="savePositionButton" class="btn btn-secondary" type="button" disabled>Save Position</button>
+            <button id="resetPositionButton" class="btn btn-secondary" type="button" disabled>Reset Position</button>
+            <span id="positionStatus" class="text-xs text-slate-400">Upload an image to adjust position.</span>
+          </div>
           <p class="text-sm text-slate-300">
-            Preview shows the poster area with estimated tile grid. The PDF will include full-resolution
-            tiles and optional overlap margins.
+            Drag the image inside the preview to reposition it. Click save before generating the PDF.
           </p>
         </div>
       </section>

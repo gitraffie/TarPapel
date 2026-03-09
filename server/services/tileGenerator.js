@@ -197,9 +197,16 @@ async function generateTiledPdf({
   overlap,
   customWidth,
   customHeight,
-  includeGuides = true
+  includeGuides = true,
+  orientation = "portrait",
+  focalX = 0,
+  focalY = 0
 }) {
-  const posterDims = getPosterDimensions(posterSize, customWidth, customHeight);
+  const posterDimsRaw = getPosterDimensions(posterSize, customWidth, customHeight);
+  const posterDims =
+    orientation === "landscape"
+      ? { widthFt: posterDimsRaw.heightFt, heightFt: posterDimsRaw.widthFt }
+      : posterDimsRaw;
   const paperDims = getPaperDimensions(paperSize);
   const overlapIn = clampOverlap(overlap, paperDims.widthIn, paperDims.heightIn);
 
@@ -208,7 +215,13 @@ async function generateTiledPdf({
   const paperWidthPx = inchesToPixels(paperDims.widthIn);
   const paperHeightPx = inchesToPixels(paperDims.heightIn);
 
-  const resizedBuffer = await resizeToPoster(imagePath, posterWidthPx, posterHeightPx);
+  const resizedBuffer = await resizeToPoster(
+    imagePath,
+    posterWidthPx,
+    posterHeightPx,
+    Number(focalX) || 0,
+    Number(focalY) || 0
+  );
   const layout = computeTileLayout(
     posterWidthPx,
     posterHeightPx,

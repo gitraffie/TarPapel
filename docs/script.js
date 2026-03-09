@@ -12,6 +12,9 @@ const previewCanvas = document.getElementById("previewCanvas");
 const tileSummary = document.getElementById("tileSummary");
 const customSizeFields = document.getElementById("customSizeFields");
 const includeGuides = document.getElementById("includeGuides");
+const savePositionButton = document.getElementById("savePositionButton");
+const resetPositionButton = document.getElementById("resetPositionButton");
+const positionStatus = document.getElementById("positionStatus");
 const progressWrap = document.getElementById("progressWrap");
 const progressBar = document.getElementById("progressBar");
 const progressLabel = document.getElementById("progressLabel");
@@ -24,6 +27,10 @@ const API_BASE = window.location.hostname.endsWith("github.io")
   : "";
 let progressTimer = null;
 let progressValue = 0;
+let offsetX = 0;
+let offsetY = 0;
+let dragState = null;
+let isPositionSaved = false;
 
 const PAPER_SIZES = {
   A4: { widthIn: 8.27, heightIn: 11.69 },
@@ -51,6 +58,10 @@ function getPosterSizeSelection() {
   return { value: selected, ...POSTER_PRESETS[selected] };
 }
 
+function getOrientationSelection() {
+  return document.querySelector("input[name='orientation']:checked").value;
+}
+
 function getPaperSelection() {
   return document.querySelector("input[name='paperSize']:checked").value;
 }
@@ -69,6 +80,20 @@ function setStatus(message, tone = "neutral") {
     statusMessage.classList.add("text-emerald-300");
   } else {
     statusMessage.classList.add("text-slate-300");
+  }
+}
+
+function setPositionSaved(saved) {
+  isPositionSaved = saved;
+  savePositionButton.disabled = !previewImage;
+  resetPositionButton.disabled = !previewImage;
+  generateButton.disabled = !saved;
+  if (!previewImage) {
+    positionStatus.textContent = "Upload an image to adjust position.";
+  } else if (saved) {
+    positionStatus.textContent = "Position saved. You can generate the PDF.";
+  } else {
+    positionStatus.textContent = "Drag to reposition, then click Save Position.";
   }
 }
 
@@ -192,8 +217,11 @@ function renderPreview() {
   }
 
   const poster = getPosterSizeSelection();
+  const orientation = getOrientationSelection();
+  const posterWidthFt = orientation === "landscape" ? poster.heightFt : poster.widthFt;
+  const posterHeightFt = orientation === "landscape" ? poster.widthFt : poster.heightFt;
   const layout = computeTileLayout();
-  if (!poster.widthFt || !poster.heightFt || !layout.columns || !layout.rows) {
+  if (!posterWidthFt || !posterHeightFt || !layout.columns || !layout.rows) {
     ctx.fillStyle = "#94a3b8";
     ctx.font = "16px Sora, sans-serif";
     ctx.fillText("Enter a valid custom size.", 20, 40);
@@ -201,7 +229,7 @@ function renderPreview() {
     return;
   }
 
-  const aspect = poster.widthFt / poster.heightFt;
+  const aspect = posterWidthFt / posterHeightFt;
   const canvasAspect = previewCanvas.width / previewCanvas.height;
   let drawWidth = previewCanvas.width * 0.85;
   let drawHeight = drawWidth / aspect;
@@ -231,6 +259,11 @@ function renderPreview() {
     srcY = (previewImage.height - srcHeight) / 2;
   }
 
+  const maxShiftX = Math.max(0, previewImage.width - srcWidth);
+  const maxShiftY = Math.max(0, previewImage.height - srcHeight);
+  srcX = Math.min(maxShiftX, Math.max(0, srcX + offsetX * (maxShiftX / 2)));
+  srcY = Math.min(maxShiftY, Math.max(0, srcY + offsetY * (maxShiftY / 2)));
+
   ctx.drawImage(
     previewImage,
     srcX,
@@ -245,8 +278,8 @@ function renderPreview() {
 
   const colStarts = layout.colStarts || [];
   const rowStarts = layout.rowStarts || [];
-  const posterWidthIn = poster.widthFt * 12;
-  const posterHeightIn = poster.heightFt * 12;
+  const posterWidthIn = posterWidthFt * 12;
+  const posterHeightIn = posterHeightFt * 12;
 
   ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
   ctx.lineWidth = 1;
@@ -277,6 +310,9 @@ async function handleFile(file) {
   updateFileStatus(file);
   try {
     previewImage = await loadPreview(file);
+    offsetX = 0;
+    offsetY = 0;
+    setPositionSaved(false);
     renderPreview();
   } catch (error) {
     setStatus("Unable to load preview. Try another image.", "error");
@@ -329,14 +365,18 @@ function failProgress() {
 
 function getFormPayload() {
   const poster = getPosterSizeSelection();
+  const orientation = getOrientationSelection();
   const paperSize = getPaperSelection();
   return {
     posterSize: poster.value,
     paperSize,
+    orientation,
     overlap: overlapInput.value,
     customWidth: poster.widthFt || "",
     customHeight: poster.heightFt || "",
-    includeGuides: includeGuides.checked
+    includeGuides: includeGuides.checked,
+    focalX: offsetX.toFixed(3),
+    focalY: offsetY.toFixed(3)
   };
 }
 
@@ -368,6 +408,14 @@ imageInput.addEventListener("change", (event) => {
 document.querySelectorAll("input[name='posterSize']").forEach((radio) => {
   radio.addEventListener("change", () => {
     updateCustomFields();
+    setPositionSaved(false);
+    renderPreview();
+  });
+});
+
+document.querySelectorAll("input[name='orientation']").forEach((radio) => {
+  radio.addEventListener("change", () => {
+    setPositionSaved(false);
     renderPreview();
   });
 });
@@ -396,6 +444,10 @@ generateButton.addEventListener("click", async () => {
   const poster = getPosterSizeSelection();
   if (poster.value === "custom" && (!poster.widthFt || !poster.heightFt)) {
     setStatus("Enter both custom width and height.", "error");
+    return;
+  }
+  if (!isPositionSaved) {
+    setStatus("Please save the image position before generating the PDF.", "error");
     return;
   }
 
@@ -442,6 +494,49 @@ downloadButton.addEventListener("click", () => {
   document.body.removeChild(link);
 });
 
+savePositionButton.addEventListener("click", () => {
+  if (!previewImage) return;
+  setPositionSaved(true);
+});
+
+resetPositionButton.addEventListener("click", () => {
+  if (!previewImage) return;
+  offsetX = 0;
+  offsetY = 0;
+  setPositionSaved(false);
+  renderPreview();
+});
+
+previewCanvas.addEventListener("pointerdown", (event) => {
+  if (!previewImage) return;
+  const rect = previewCanvas.getBoundingClientRect();
+  dragState = {
+    startX: event.clientX,
+    startY: event.clientY,
+    rect,
+    offsetX,
+    offsetY
+  };
+  previewCanvas.classList.add("dragging");
+});
+
+window.addEventListener("pointermove", (event) => {
+  if (!dragState) return;
+  const dx = (event.clientX - dragState.startX) / dragState.rect.width;
+  const dy = (event.clientY - dragState.startY) / dragState.rect.height;
+  offsetX = Math.max(-1, Math.min(1, dragState.offsetX + dx * 2));
+  offsetY = Math.max(-1, Math.min(1, dragState.offsetY + dy * 2));
+  setPositionSaved(false);
+  renderPreview();
+});
+
+window.addEventListener("pointerup", () => {
+  if (!dragState) return;
+  dragState = null;
+  previewCanvas.classList.remove("dragging");
+});
+
 updateCustomFields();
 renderPreview();
 setStatus("");
+setPositionSaved(false);

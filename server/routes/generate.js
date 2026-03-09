@@ -37,6 +37,9 @@ router.post("/generate", upload.single("image"), async (req, res) => {
     const customWidth = Number(req.body.customWidth || 0);
     const customHeight = Number(req.body.customHeight || 0);
     const includeGuides = req.body.includeGuides !== "false";
+    const orientation = req.body.orientation || "portrait";
+    const focalX = Number(req.body.focalX || 0);
+    const focalY = Number(req.body.focalY || 0);
 
     if (!posterSize || !paperSize) {
       return res.status(400).json({ error: "Poster size and paper size are required." });
@@ -49,7 +52,10 @@ router.post("/generate", upload.single("image"), async (req, res) => {
       overlap,
       customWidth,
       customHeight,
-      includeGuides
+      includeGuides,
+      orientation,
+      focalX,
+      focalY
     });
 
     res.setHeader("Content-Type", "application/pdf");
